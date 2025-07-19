@@ -5,7 +5,7 @@ import os
 import networkx as nx
 import plotly.graph_objects as go
 
-# ----------- Visually Appealing Background Styling ------------
+# --------- Stylish Background -----------
 def set_bg():
     st.markdown(
         """
@@ -25,10 +25,9 @@ def set_bg():
         </style>
         """, unsafe_allow_html=True
     )
-
 set_bg()
 
-# ------------ User Credential Utilities -----------------------
+# ---------- User Credential Utilities ------------
 USERS_CSV = 'users.csv'
 
 def hash_pw(pw):
@@ -53,7 +52,7 @@ def validate_login(username, password):
     match = users[(users['username'] == username) & (users['password'] == hash_pw(password))]
     return not match.empty
 
-# ----------------- Session State Setups -----------------------
+# ------------ Session State Setups ------------
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "username" not in st.session_state:
@@ -61,7 +60,7 @@ if "username" not in st.session_state:
 if "registration_mode" not in st.session_state:
     st.session_state["registration_mode"] = False
 
-# -------------------- Authentication Pages --------------------
+# ------------- Authentication Pages -------------
 def registration_page():
     st.title("Register New Account")
     username = st.text_input("Choose a Username")
@@ -100,7 +99,7 @@ def logout():
         st.session_state["username"] = None
         st.experimental_rerun()
 
-# ------------- App Flow Management: Auth and Main -------------
+# ----------------- App Authentication Flow -----------------
 if not st.session_state["logged_in"]:
     if st.session_state["registration_mode"]:
         registration_page()
@@ -111,140 +110,98 @@ else:
     st.sidebar.success(f"Logged in as {st.session_state['username']}")
     logout()
 
-# ---------------------------- Dashboard ------------------------
+# ----------- Main Dashboard and Single Data Upload ----------
+
 st.title("Aquaculture Supply Chain Finance & Traceability Dashboard")
 st.markdown(
-    "Upload your aquaculture supply chain datasets below. "
-    "Visualizations and analytics will refresh with your uploads."
+    "Upload your aquaculture supply chain CSV file below. "
+    "The dashboard will generate analytics and visualizations from your data."
 )
 
-# --------------------- Sidebar: Only Upload -------------------
-st.sidebar.markdown("### Upload Your Data")
-trans_file = st.sidebar.file_uploader("Upload transactions.csv", type='csv')
-batch_file = st.sidebar.file_uploader("Upload batches.csv", type='csv')
-log_file = st.sidebar.file_uploader("Upload logistics.csv", type='csv')
+uploaded_file = st.file_uploader("Upload your supply chain CSV (with columns for transactions, batches, logistics, etc.)", type='csv')
 
-@st.cache_data
-def load_csv(file):
-    if file:
-        return pd.read_csv(file)
-    else:
-        st.warning("Please upload required CSV files to continue.")
-        return pd.DataFrame()  # Return empty DataFrame for missing file
+if uploaded_file is not None:
+    try:
+        df = pd.read_csv(uploaded_file)
+        # Assume all columns exist in one file, otherwise instruct users accordingly.
+        st.header("Data Preview")
+        st.dataframe(df)
 
-transactions = load_csv(trans_file)
-batches = load_csv(batch_file)
-logistics = load_csv(log_file)
+        # Example logic: (You may parse/split df based on context or send instructions)
+        # For simplicity, visualize as a network graph using assumed columns
+        def build_graph(df):
+            G = nx.DiGraph()
+            # Adapt below to your CSV's structure
+            if {'from_entity','to_entity','batch_id'}.issubset(df.columns):
+                for _, row in df.iterrows():
+                    G.add_node(row['from_entity'], label='Entity')
+                    G.add_node(row['to_entity'], label='Entity')
+                    G.add_node(row['batch_id'], label='Batch')
+                    G.add_edge(row['from_entity'], row['to_entity'], batch=row['batch_id'])
+            return G
 
-# Only display dashboard if dataframes are not empty
-if transactions.empty or batches.empty or logistics.empty:
-    st.warning("Please upload all three required files: transactions.csv, batches.csv, and logistics.csv.")
-    st.stop()
+        G = build_graph(df)
 
-# --------------- Supply Chain Analysis and Visualization -----------------
-def build_graph(transactions, batches, logistics):
-    G = nx.DiGraph()
-    for _, batch in batches.iterrows():
-        G.add_node(batch['batch_id'], label='Batch', origin=batch['origin'])
-    for _, row in transactions.iterrows():
-        G.add_node(row['from_entity'], label='Entity')
-        G.add_node(row['to_entity'], label='Entity')
-        G.add_edge(row['from_entity'], row['to_entity'], batch=row['batch_id'],
-                   date=row['transaction_date'],
-                   payment=row['payment_date'])
-    for _, row in logistics.iterrows():
-        G.add_edge(row['from_location'], row['to_location'], batch=row['batch_id'],
-                   start=row['start_date'], end=row['end_date'])
-    return G
+        def plot_graph(G):
+            pos = nx.spring_layout(G, seed=42)
+            edge_x, edge_y = [], []
+            for u, v in G.edges():
+                x0, y0 = pos.get(u, (0,0))
+                x1, y1 = pos.get(v, (0,0))
+                edge_x += [x0, x1, None]
+                edge_y += [y0, y1, None]
+            node_x, node_y, node_text = [], [], []
+            for node in G.nodes:
+                x, y = pos.get(node, (0,0))
+                node_x.append(x)
+                node_y.append(y)
+                node_text.append(str(node))
+            edge_trace = go.Scatter(x=edge_x, y=edge_y, mode='lines', line=dict(width=1, color='gray'),
+                                    hoverinfo='none', showlegend=False)
+            node_trace = go.Scatter(x=node_x, y=node_y, mode='markers+text', text=node_text,
+                                    marker=dict(size=20, color='LightSkyBlue', line=dict(width=2, color='darkblue')),
+                                    textposition="bottom center", hoverinfo='text')
+            fig = go.Figure([edge_trace, node_trace])
+            fig.update_layout(
+                height=500, margin=dict(l=24, r=24, t=60, b=32),
+                title="Supply Chain Network Map",
+                showlegend=False,
+                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Open Sans, Arial", size=15)
+            )
+            return fig
 
-def payment_lead_times(trans):
-    if 'payment_date' in trans and 'delivery_date' in trans:
-        return (pd.to_datetime(trans['payment_date']) - pd.to_datetime(trans['delivery_date'])).dt.days
-    return pd.Series([None]*len(trans))
+        if len(G):
+            st.header("Network Visualization")
+            fig = plot_graph(G)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Insufficient data provided for network visualization.")
 
-def working_capital_cycle(trans):
-    if 'payment_date' in trans and 'transaction_date' in trans:
-        return (pd.to_datetime(trans['payment_date']) - pd.to_datetime(trans['transaction_date'])).dt.days.mean()
-    return float('nan')
+        # Key Metrics example (adapt if you include all columns)
+        if {'payment_date','delivery_date','transaction_date'}.issubset(df.columns):
+            lead_times = (pd.to_datetime(df['payment_date']) - pd.to_datetime(df['delivery_date'])).dt.days
+            working_cap = (pd.to_datetime(df['payment_date']) - pd.to_datetime(df['transaction_date'])).dt.days.mean()
+            st.metric("Average Payment Lead Time (days)", f"{lead_times.mean():.1f}")
+            st.metric("Working Capital Cycle (days)", f"{working_cap:.1f}")
+        else:
+            st.info("Metrics unavailable: ensure your uploaded data has 'payment_date', 'delivery_date', 'transaction_date' columns.")
 
-def detect_bottlenecks(logistics):
-    if 'end_date' in logistics and 'start_date' in logistics:
-        total_time = (pd.to_datetime(logistics['end_date']) - pd.to_datetime(logistics['start_date'])).dt.days
-        if not len(total_time):
-            return pd.DataFrame()
-        avg = total_time.mean()
-        return logistics[total_time > avg * 1.5]
-    return pd.DataFrame()
+        # Bottleneck logic (example logic if the right columns are present)
+        if {'start_date','end_date'}.issubset(df.columns):
+            total_time = (pd.to_datetime(df['end_date']) - pd.to_datetime(df['start_date'])).dt.days
+            avg = total_time.mean()
+            bottlenecks = df[total_time > avg * 1.5]
+            st.header("Bottlenecks")
+            if not bottlenecks.empty:
+                st.warning("Detected Bottlenecks in Logistics:")
+                st.dataframe(bottlenecks)
+            else:
+                st.success("No significant bottlenecks detected.")
+        else:
+            st.info("Bottleneck detection unavailable: ensure your uploaded data has 'start_date', 'end_date' columns.")
 
-def plot_graph(G):
-    pos = nx.spring_layout(G, seed=42)
-    edge_x, edge_y, edge_text = [], [], []
-    for u, v, d in G.edges(data=True):
-        x0, y0 = pos.get(u, (0,0))
-        x1, y1 = pos.get(v, (0,0))
-        edge_x += [x0, x1, None]
-        edge_y += [y0, y1, None]
-        batch_label = f", batch {d.get('batch', '')}" if d.get('batch') else ""
-        edge_text.append(f"{u} → {v}{batch_label}")
-
-    node_x, node_y, node_text = [], [], []
-    for node in G.nodes:
-        x, y = pos.get(node, (0,0))
-        node_x.append(x)
-        node_y.append(y)
-        node_text.append(str(node))
-
-    edge_trace = go.Scatter(
-        x=edge_x, y=edge_y, mode='lines', line=dict(width=1, color='gray'),
-        hoverinfo='text', showlegend=False
-    )
-    node_trace = go.Scatter(
-        x=node_x, y=node_y, mode='markers+text', text=node_text,
-        marker=dict(size=20, color='LightSkyBlue', line=dict(width=2, color='darkblue')),
-        textposition="bottom center",
-        hoverinfo='text'
-    )
-    fig = go.Figure([edge_trace, node_trace])
-    fig.update_layout(
-        height=520, 
-        margin=dict(l=24, r=24, t=60, b=32),
-        title="Supply Chain Network Map",
-        showlegend=False,
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Open Sans, Arial", size=15)
-    )
-    return fig
-
-# ---------------------- Main Dashboard Sections ---------------------
-st.header("1. Network Visualization")
-G = build_graph(transactions, batches, logistics)
-if len(G):
-    fig = plot_graph(G)
-    st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
 else:
-    st.info("Insufficient data provided for network visualization.")
-
-st.header("2. Key Metrics")
-lead_times = payment_lead_times(transactions)
-working_cap = working_capital_cycle(transactions)
-st.metric("Average Payment Lead Time (days)", f"{lead_times.mean():.1f}" if lead_times.notnull().any() else "-")
-st.metric("Working Capital Cycle (days)", f"{working_cap:.1f}" if not pd.isna(working_cap) else "-")
-
-st.header("3. Bottlenecks")
-bottlenecks = detect_bottlenecks(logistics)
-if bottlenecks is not None and not bottlenecks.empty:
-    st.warning("Detected Bottlenecks in Logistics:")
-    st.dataframe(bottlenecks)
-else:
-    st.success("No significant bottlenecks detected.")
-
-st.header("4. Uploaded Data Previews")
-with st.expander("Transactions Data"):
-    st.dataframe(transactions)
-with st.expander("Batches Data"):
-    st.dataframe(batches)
-with st.expander("Logistics Data"):
-    st.dataframe(logistics)
-
-st.success("Dashboard ready. Use the sidebar for registration, login, and uploading your supply chain data files.")
+    st.info("Please upload your supply chain CSV file to get started.")
