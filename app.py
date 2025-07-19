@@ -7,7 +7,7 @@ import networkx as nx
 import plotly.graph_objects as go
 import datetime
 
-# --------- Configuration and Branding -----------
+# --------- App Brand & Styling ----------
 st.set_page_config(page_title="AquaChain Portal", layout="wide", page_icon="🐟")
 
 def set_bg():
@@ -34,9 +34,10 @@ set_bg()
 st.markdown("<h1 style='color:#095561;font-size:2.3rem'>🐟 AquaChain Portal</h1>", unsafe_allow_html=True)
 st.markdown("##### Secure, Real-time Aquaculture Supply Chain Dashboard")
 
-# --------- User Credential Utilities -----------
+# ---------- User Credential Utilities -----------
 USERS_CSV = 'users.csv'
-ROLES = ['Admin', 'Manager', 'Supplier', 'Auditor']
+ELEVATED_ROLES = ['Admin', 'Manager', 'Supplier', 'Auditor']
+REGISTRATION_ROLE = "User"
 
 def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
@@ -62,7 +63,7 @@ def save_user(username, password, role):
 def validate_login(username, password):
     users = load_users()
     match = users[(users['username'] == username) & (users['password'] == hash_pw(password))]
-    if not match.empty and 'role' in match.columns:
+    if not match.empty:
         return match.iloc[0]['role']
     return None
 
@@ -78,13 +79,14 @@ if "registration_mode" not in st.session_state:
 if "onboarded" not in st.session_state:
     st.session_state["onboarded"] = False
 
-# --------- Authentication Pages ----------
+# --------- Registration Page (Restricted Role) ----------
 def registration_page():
     st.header("Register New Account")
     username = st.text_input("Choose Username")
     password = st.text_input("Choose Password", type="password")
     password2 = st.text_input("Confirm Password", type="password")
-    role = st.selectbox("Register as", ROLES)
+    role = REGISTRATION_ROLE  # Only "User" allowed for public registration
+    st.markdown("You will be registered as a standard user. For elevated access, please contact an administrator.")
     if st.button("Create Account"):
         if not username or not password:
             st.error("Please complete all fields.")
@@ -122,7 +124,14 @@ def logout():
         st.session_state["role"] = None
         st.experimental_rerun()
 
-# --------- Main App Workflow ----------
+# --------- Admin-only: Manage Users & Elevate Roles ----------
+def admin_manage_users():
+    st.subheader("User Management (Admin only)")
+    users = load_users()
+    st.dataframe(users)
+    st.info("To assign roles beyond User, contact technical admin to update the user database.")
+
+# --------- Main App Workflow (with Corrected Registration) ----------
 if not st.session_state["logged_in"]:
     if st.session_state["registration_mode"]:
         registration_page()
@@ -140,9 +149,11 @@ else:
 
 # --------- Tabbed Main Navigation ---------
 menu_options = ["Home Dashboard","Orders","Shipments","Analytics","Documents","Suppliers","Settings"]
+if st.session_state["role"] == "Admin":
+    menu_options.append("User Management")
 selected = option_menu(
     None, menu_options,
-    icons=["house","boxes","truck","bar-chart","file-earmark-arrow-up","people","gear"],
+    icons=["house","boxes","truck","bar-chart","file-earmark-arrow-up","people","gear","shield-lock"],
     orientation='horizontal'
 )
 
@@ -198,7 +209,7 @@ def settings_center():
 # --------- Home Dashboard ---------
 def home_dashboard(df):
     col1, col2, col3 = st.columns(3)
-    col1.metric("Live Orders", 18)
+    col1.metric("Live Orders", 18)      # demo value
     col2.metric("On-Time Shipments", "95%")
     col3.metric("Supplier Rating", "4.7/5")
     alerts = get_alerts(df)
@@ -217,9 +228,9 @@ def home_dashboard(df):
 def orders_center(df):
     st.subheader("Orders Management")
     if df is not None:
-        display_cols = [col for col in ["order_id","status","created_at","payment_due_date","amount"] if col in df.columns]
-        if display_cols:
-            st.dataframe(df[display_cols].head(20))
+        cols = ["order_id","status","created_at","payment_due_date","amount"]
+        present = [col for col in cols if col in df.columns]
+        st.dataframe(df[present].head(20))
     st.info("This table presents current and historical orders, filterable and searchable.")
     if st.session_state["role"] in ["Admin","Manager"]:
         st.button("Create New Order (UI)")
@@ -228,16 +239,13 @@ def orders_center(df):
 def shipments_center(df):
     st.subheader("Shipments")
     if df is not None and "shipment_id" in df.columns:
-        display_cols = [col for col in ["shipment_id","status","delivery_eta","delivered"] if col in df.columns]
-        if display_cols:
-            st.dataframe(df[display_cols].head(20))
+        st.dataframe(df[["shipment_id","status","delivery_eta","delivered"]].head(20))
     st.info("Track, manage and update all active shipments from here.")
 
 # --------- Analytics (Network, Metrics, Bottleneck) ---------
 def analytics_center(df):
     st.subheader("Supply Chain Analytics")
     if df is not None:
-        # Network Graph Visualization
         def build_graph(df):
             G = nx.DiGraph()
             if {'from_entity','to_entity','batch_id'}.issubset(df.columns):
@@ -285,7 +293,6 @@ def analytics_center(df):
             st.caption("Shows flow from supplier to customer by batch.")
         else:
             st.info("Network: Provide columns 'from_entity', 'to_entity', 'batch_id' in data.")
-        # Metrics
         if {'payment_date','delivery_date','transaction_date'}.issubset(df.columns):
             lead_times = (pd.to_datetime(df['payment_date']) - pd.to_datetime(df['delivery_date'])).dt.days
             working_cap = (pd.to_datetime(df['payment_date']) - pd.to_datetime(df['transaction_date'])).dt.days.mean()
@@ -293,7 +300,6 @@ def analytics_center(df):
             st.metric("Working Capital Cycle (days)", f"{working_cap:.1f}")
         else:
             st.info("Metrics: Add 'payment_date', 'delivery_date', 'transaction_date' for finance analytics.")
-        # Bottleneck
         if {'start_date','end_date'}.issubset(df.columns):
             total_time = (pd.to_datetime(df['end_date']) - pd.to_datetime(df['start_date'])).dt.days
             avg = total_time.mean()
@@ -309,7 +315,7 @@ def analytics_center(df):
     else:
         st.info("Upload your supply chain CSV in 'Documents' tab to enable analytics.")
 
-# --------- Data Storage (Upload/Import) ---------
+# --------- Data Storage (Demo Fallback) ---------
 @st.cache_data(show_spinner=False)
 def load_demo_csv():
     demo_data = {
@@ -371,3 +377,5 @@ elif selected == "Suppliers":
     directory_hub()
 elif selected == "Settings":
     settings_center()
+elif selected == "User Management" and st.session_state["role"] == "Admin":
+    admin_manage_users()
