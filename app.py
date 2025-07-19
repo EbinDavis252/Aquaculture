@@ -114,11 +114,11 @@ else:
 # ---------------------------- Dashboard ------------------------
 st.title("Aquaculture Supply Chain Finance & Traceability Dashboard")
 st.markdown(
-    "Upload your aquaculture supply chain datasets below or download example files to get started. "
+    "Upload your aquaculture supply chain datasets below. "
     "Visualizations and analytics will refresh with your uploads."
 )
 
-# ------------- Example CSVs (for download and demo data) ---------------
+# ------------- Example CSVs (for demo fallback only) ---------------
 example_transactions = """transaction_id,from_entity,to_entity,batch_id,transaction_date,delivery_date,payment_date,payment_term
 1,Farmer A,Processor B,B001,2025-07-01,2025-07-03,2025-07-10,7
 2,Processor B,Distributor C,B001,2025-07-05,2025-07-07,2025-07-15,8
@@ -133,12 +133,7 @@ example_logistics = """move_id,batch_id,from_location,to_location,start_date,end
 2,B002,Farm Y,Processor B,2025-07-05,2025-07-07,250
 """
 
-# --------------------- Sidebar: Download and Upload --------------
-st.sidebar.markdown("### Download Example Datasets")
-st.sidebar.download_button("transactions.csv", example_transactions, "transactions.csv")
-st.sidebar.download_button("batches.csv", example_batches, "batches.csv")
-st.sidebar.download_button("logistics.csv", example_logistics, "logistics.csv")
-
+# --------------------- Sidebar: Only Upload Section --------------
 st.sidebar.markdown("### Upload Your Data")
 trans_file = st.sidebar.file_uploader("transactions.csv", type='csv')
 batch_file = st.sidebar.file_uploader("batches.csv", type='csv')
@@ -264,4 +259,4 @@ with st.expander("Batches Data"):
 with st.expander("Logistics Data"):
     st.dataframe(logistics)
 
-st.success("Dashboard ready. Use the sidebar for registration, login, data upload, or downloading templates. Enjoy the live insights!")
+st.success("Dashboard ready. Use the sidebar for registration, login, and data upload. Enjoy the live insights!")
