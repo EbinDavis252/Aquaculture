@@ -110,28 +110,28 @@ else:
     st.sidebar.success(f"Logged in as {st.session_state['username']}")
     logout()
 
-# ----------- Main Dashboard and Single Data Upload ----------
-
-st.title("Aquaculture Supply Chain Finance & Traceability Dashboard")
-st.markdown(
-    "Upload your aquaculture supply chain CSV file below. "
-    "The dashboard will generate analytics and visualizations from your data."
+# --------- Sidebar File Upload (Before Dashboard) -----------
+uploaded_file = st.sidebar.file_uploader(
+    "Upload your supply chain CSV (with columns for transactions, batches, logistics, etc.)",
+    type='csv'
 )
 
-uploaded_file = st.file_uploader("Upload your supply chain CSV (with columns for transactions, batches, logistics, etc.)", type='csv')
-
+# ------------ Main Dashboard Logic --------------------------
 if uploaded_file is not None:
     try:
         df = pd.read_csv(uploaded_file)
-        # Assume all columns exist in one file, otherwise instruct users accordingly.
+        st.title("Aquaculture Supply Chain Finance & Traceability Dashboard")
+        st.markdown(
+            "Uploaded aquaculture supply chain CSV file preview. "
+            "Below are analytics and visualizations from your data."
+        )
+
         st.header("Data Preview")
         st.dataframe(df)
 
-        # Example logic: (You may parse/split df based on context or send instructions)
-        # For simplicity, visualize as a network graph using assumed columns
+        # Example: Visualize as a network graph using assumed columns
         def build_graph(df):
             G = nx.DiGraph()
-            # Adapt below to your CSV's structure
             if {'from_entity','to_entity','batch_id'}.issubset(df.columns):
                 for _, row in df.iterrows():
                     G.add_node(row['from_entity'], label='Entity')
@@ -176,9 +176,9 @@ if uploaded_file is not None:
             fig = plot_graph(G)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Insufficient data provided for network visualization.")
+            st.info("Insufficient data provided for network visualization (needs 'from_entity', 'to_entity', 'batch_id').")
 
-        # Key Metrics example (adapt if you include all columns)
+        # Key Metrics: Payment Lead Time and Working Capital Cycle
         if {'payment_date','delivery_date','transaction_date'}.issubset(df.columns):
             lead_times = (pd.to_datetime(df['payment_date']) - pd.to_datetime(df['delivery_date'])).dt.days
             working_cap = (pd.to_datetime(df['payment_date']) - pd.to_datetime(df['transaction_date'])).dt.days.mean()
@@ -187,7 +187,7 @@ if uploaded_file is not None:
         else:
             st.info("Metrics unavailable: ensure your uploaded data has 'payment_date', 'delivery_date', 'transaction_date' columns.")
 
-        # Bottleneck logic (example logic if the right columns are present)
+        # Bottleneck: Find overly long logistics steps
         if {'start_date','end_date'}.issubset(df.columns):
             total_time = (pd.to_datetime(df['end_date']) - pd.to_datetime(df['start_date'])).dt.days
             avg = total_time.mean()
@@ -204,4 +204,5 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Error loading data: {e}")
 else:
-    st.info("Please upload your supply chain CSV file to get started.")
+    st.title("Aquaculture Supply Chain Finance & Traceability Dashboard")
+    st.info("Please upload your supply chain CSV file in the sidebar to get started.")
