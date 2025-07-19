@@ -43,7 +43,8 @@ def save_user(username, password):
     users = load_users()
     if username in users['username'].values:
         return False
-    users = users.append({'username': username, 'password': hash_pw(password)}, ignore_index=True)
+    new_row = pd.DataFrame([{'username': username, 'password': hash_pw(password)}])
+    users = pd.concat([users, new_row], ignore_index=True)
     users.to_csv(USERS_CSV, index=False)
     return True
 
