@@ -118,52 +118,40 @@ st.markdown(
     "Visualizations and analytics will refresh with your uploads."
 )
 
-# ------------- Example CSVs (for demo fallback only) ---------------
-example_transactions = """transaction_id,from_entity,to_entity,batch_id,transaction_date,delivery_date,payment_date,payment_term
-1,Farmer A,Processor B,B001,2025-07-01,2025-07-03,2025-07-10,7
-2,Processor B,Distributor C,B001,2025-07-05,2025-07-07,2025-07-15,8
-3,Processor B,Distributor D,B002,2025-07-07,2025-07-09,2025-07-16,7
-"""
-example_batches = """batch_id,origin,production_date,status
-B001,Farm X,2025-06-29,shipped
-B002,Farm Y,2025-07-01,in transit
-"""
-example_logistics = """move_id,batch_id,from_location,to_location,start_date,end_date,logistics_cost
-1,B001,Farm X,Processor B,2025-07-01,2025-07-03,200
-2,B002,Farm Y,Processor B,2025-07-05,2025-07-07,250
-"""
-
-# --------------------- Sidebar: Only Upload Section --------------
+# --------------------- Sidebar: Only Upload -------------------
 st.sidebar.markdown("### Upload Your Data")
-trans_file = st.sidebar.file_uploader("transactions.csv", type='csv')
-batch_file = st.sidebar.file_uploader("batches.csv", type='csv')
-log_file = st.sidebar.file_uploader("logistics.csv", type='csv')
+trans_file = st.sidebar.file_uploader("Upload transactions.csv", type='csv')
+batch_file = st.sidebar.file_uploader("Upload batches.csv", type='csv')
+log_file = st.sidebar.file_uploader("Upload logistics.csv", type='csv')
 
 @st.cache_data
-def load_csv(file, example):
+def load_csv(file):
     if file:
         return pd.read_csv(file)
-    from io import StringIO
-    return pd.read_csv(StringIO(example))
+    else:
+        st.warning("Please upload required CSV files to continue.")
+        return pd.DataFrame()  # Return empty DataFrame for missing file
 
-transactions = load_csv(trans_file, example_transactions)
-batches = load_csv(batch_file, example_batches)
-logistics = load_csv(log_file, example_logistics)
+transactions = load_csv(trans_file)
+batches = load_csv(batch_file)
+logistics = load_csv(log_file)
+
+# Only display dashboard if dataframes are not empty
+if transactions.empty or batches.empty or logistics.empty:
+    st.warning("Please upload all three required files: transactions.csv, batches.csv, and logistics.csv.")
+    st.stop()
 
 # --------------- Supply Chain Analysis and Visualization -----------------
 def build_graph(transactions, batches, logistics):
     G = nx.DiGraph()
-    # Add batches as nodes
     for _, batch in batches.iterrows():
         G.add_node(batch['batch_id'], label='Batch', origin=batch['origin'])
-    # Add entity nodes & transaction edges
     for _, row in transactions.iterrows():
         G.add_node(row['from_entity'], label='Entity')
         G.add_node(row['to_entity'], label='Entity')
         G.add_edge(row['from_entity'], row['to_entity'], batch=row['batch_id'],
                    date=row['transaction_date'],
                    payment=row['payment_date'])
-    # Add logistics edges
     for _, row in logistics.iterrows():
         G.add_edge(row['from_location'], row['to_location'], batch=row['batch_id'],
                    start=row['start_date'], end=row['end_date'])
@@ -259,4 +247,4 @@ with st.expander("Batches Data"):
 with st.expander("Logistics Data"):
     st.dataframe(logistics)
 
-st.success("Dashboard ready. Use the sidebar for registration, login, and data upload. Enjoy the live insights!")
+st.success("Dashboard ready. Use the sidebar for registration, login, and uploading your supply chain data files.")
