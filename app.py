@@ -62,7 +62,7 @@ def save_user(username, password, role):
 def validate_login(username, password):
     users = load_users()
     match = users[(users['username'] == username) & (users['password'] == hash_pw(password))]
-    if not match.empty:
+    if not match.empty and 'role' in match.columns:
         return match.iloc[0]['role']
     return None
 
@@ -149,7 +149,6 @@ selected = option_menu(
 # --------- Alert & Notification Center ----
 def get_alerts(df=None):
     alerts = []
-    # Example: Payment overdue, delayed shipment, missing document
     if df is not None and "payment_due_date" in df.columns and "paid" in df.columns:
         overdue = df[(pd.to_datetime(df["payment_due_date"]) < pd.Timestamp.today()) & (df["paid"] == False)]
         if not overdue.empty:
@@ -199,7 +198,7 @@ def settings_center():
 # --------- Home Dashboard ---------
 def home_dashboard(df):
     col1, col2, col3 = st.columns(3)
-    col1.metric("Live Orders", 18)      # demo value
+    col1.metric("Live Orders", 18)
     col2.metric("On-Time Shipments", "95%")
     col3.metric("Supplier Rating", "4.7/5")
     alerts = get_alerts(df)
@@ -218,7 +217,9 @@ def home_dashboard(df):
 def orders_center(df):
     st.subheader("Orders Management")
     if df is not None:
-        st.dataframe(df[["order_id","status","created_at","payment_due_date","amount"]].head(20))
+        display_cols = [col for col in ["order_id","status","created_at","payment_due_date","amount"] if col in df.columns]
+        if display_cols:
+            st.dataframe(df[display_cols].head(20))
     st.info("This table presents current and historical orders, filterable and searchable.")
     if st.session_state["role"] in ["Admin","Manager"]:
         st.button("Create New Order (UI)")
@@ -227,7 +228,9 @@ def orders_center(df):
 def shipments_center(df):
     st.subheader("Shipments")
     if df is not None and "shipment_id" in df.columns:
-        st.dataframe(df[["shipment_id","status","delivery_eta","delivered"]].head(20))
+        display_cols = [col for col in ["shipment_id","status","delivery_eta","delivered"] if col in df.columns]
+        if display_cols:
+            st.dataframe(df[display_cols].head(20))
     st.info("Track, manage and update all active shipments from here.")
 
 # --------- Analytics (Network, Metrics, Bottleneck) ---------
