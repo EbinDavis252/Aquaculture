@@ -7,7 +7,7 @@ import networkx as nx
 import plotly.graph_objects as go
 import datetime
 
-# --------- App Branding & Styling ----------
+# --------- App Brand & Styling ----------
 st.set_page_config(page_title="AquaChain Portal", layout="wide", page_icon="🐟")
 
 def set_bg():
@@ -34,10 +34,10 @@ set_bg()
 st.markdown("<h1 style='color:#095561;font-size:2.3rem'>🐟 AquaChain Portal</h1>", unsafe_allow_html=True)
 st.markdown("##### Secure, Real-time Aquaculture Supply Chain Dashboard")
 
-# ---------- User Credentials Utilities ----------
+# ---------- User Credential Utilities -----------
 USERS_CSV = 'users.csv'
-REGISTRATION_ROLE = "User"
 ELEVATED_ROLES = ['Admin', 'Manager', 'Supplier', 'Auditor']
+REGISTRATION_ROLE = "User"
 
 def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
@@ -67,7 +67,7 @@ def validate_login(username, password):
         return match.iloc[0]['role']
     return None
 
-# --------- Session State Setup ----------
+# --------- Session State Setups ----------
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "username" not in st.session_state:
@@ -111,7 +111,7 @@ def login_page():
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["role"] = role
-            st.experimental_rerun()
+            st.rerun() # CORRECTED
         else:
             st.error("Incorrect username or password.")
     if col2.button("Register New Account"):
@@ -122,9 +122,9 @@ def logout():
         st.session_state["logged_in"] = False
         st.session_state["username"] = None
         st.session_state["role"] = None
-        st.experimental_rerun()
+        st.rerun() # CORRECTED
 
-# --------- Admin-only: Manage Users ----------
+# --------- Admin-only: Manage Users & Elevate Roles ----------
 def admin_manage_users():
     st.subheader("User Management (Admin only)")
     users = load_users()
