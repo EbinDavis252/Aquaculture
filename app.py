@@ -7,7 +7,7 @@ import networkx as nx
 import plotly.graph_objects as go
 import datetime
 
-# --------- App Brand & Styling ----------
+# --------- App Branding & Styling ----------
 st.set_page_config(page_title="AquaChain Portal", layout="wide", page_icon="🐟")
 
 def set_bg():
@@ -34,10 +34,10 @@ set_bg()
 st.markdown("<h1 style='color:#095561;font-size:2.3rem'>🐟 AquaChain Portal</h1>", unsafe_allow_html=True)
 st.markdown("##### Secure, Real-time Aquaculture Supply Chain Dashboard")
 
-# ---------- User Credential Utilities -----------
+# ---------- User Credentials Utilities ----------
 USERS_CSV = 'users.csv'
-ELEVATED_ROLES = ['Admin', 'Manager', 'Supplier', 'Auditor']
 REGISTRATION_ROLE = "User"
+ELEVATED_ROLES = ['Admin', 'Manager', 'Supplier', 'Auditor']
 
 def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
@@ -67,7 +67,7 @@ def validate_login(username, password):
         return match.iloc[0]['role']
     return None
 
-# --------- Session State Setups ----------
+# --------- Session State Setup ----------
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 if "username" not in st.session_state:
@@ -124,7 +124,7 @@ def logout():
         st.session_state["role"] = None
         st.experimental_rerun()
 
-# --------- Admin-only: Manage Users & Elevate Roles ----------
+# --------- Admin-only: Manage Users ----------
 def admin_manage_users():
     st.subheader("User Management (Admin only)")
     users = load_users()
